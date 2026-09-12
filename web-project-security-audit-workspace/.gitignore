@@ -1,2 +1,4 @@
 # Resultados de corridas de evaluación: se regeneran, no se versionan.
 iteration-*/
+__pycache__/
+*.pyc
