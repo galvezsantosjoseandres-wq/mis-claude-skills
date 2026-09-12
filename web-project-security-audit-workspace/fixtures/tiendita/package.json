@@ -1,0 +1,11 @@
+{
+  "name": "tiendita",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": { "start": "node src/server.js" },
+  "dependencies": {
+    "express": "4.17.1",
+    "cookie-session": "1.4.0",
+    "sqlite3": "5.0.0"
+  }
+}

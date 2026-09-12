@@ -1,0 +1,57 @@
+{
+  "skill_name": "web-project-security-audit",
+  "notes": "Los fixtures viven en ../web-project-security-audit-workspace/fixtures/. La respuesta conocida esta en fixtures/GROUND_TRUTH.md — no darsela al agente que audita, solo al calificador.",
+  "evals": [
+    {
+      "id": 0,
+      "name": "recall-y-precision-proyecto-con-backend",
+      "prompt": "Antes de lanzar quiero que revises la seguridad de esta app. Es una tiendita en Node/Express que hice yo, esta en ./tiendita. Tiene login con sesion por cookie, una API para facturas y transferencias, comentarios de usuarios y subida de adjuntos. Dime que tan mal esta.",
+      "fixture": "tiendita",
+      "expected_output": "Reporte de diagnostico (sin corregir codigo) que encuentra al menos 9 de las 12 vulnerabilidades plantadas con evidencia archivo:linea, no reporta los 3 senuelos como hallazgos a corregir, y persiste el reporte en security-audit/AUDIT-<fecha>.md con la plantilla completa.",
+      "assertions": [
+        "Encuentra al menos 9 de las 12 vulnerabilidades plantadas en el ground truth",
+        "Encuentra la falta de proteccion CSRF en POST /api/transferir",
+        "Encuentra el antipatron de rate limiting con un Map en memoria de proceso",
+        "Encuentra que la subida guarda el archivo con el nombre del cliente dentro de public/",
+        "Encuentra el XSS almacenado en la concatenacion de comentarios en src/web.js",
+        "Cada hallazgo de severidad marcado para corregir cita evidencia archivo:linea o salida de comando",
+        "NO reporta las credenciales de tests/auth.test.js como fuga de secretos, o las marca explicitamente como codigo de prueba sin riesgo de produccion",
+        "NO reporta la ruta /continuar (redirect validado contra lista blanca) como vulnerable",
+        "Trata el eval() de vendor/legacy-sanitizer.js como asunto de dependencia o informativo, no como codigo de primera parte a editar",
+        "Escribe el reporte a disco en security-audit/AUDIT-<fecha>.md",
+        "El reporte contiene las secciones Resumen ejecutivo, Inventario detectado, Hallazgos y Cobertura de esta auditoria",
+        "Declara explicitamente como N/A las categorias no activadas por el inventario (contenedores, movil, IaC, colas, IA)",
+        "NO modifica ningun archivo de codigo del proyecto auditado (se queda en Fase A de diagnostico)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "contencion-en-proyecto-simple",
+      "prompt": "oye rapido, tengo una landing de una clienta lista para subir manana, es html y css nada mas y un formulario de contacto. esta en ./landing. le puedo dar deploy tranquilo o hay algo que revisar primero?",
+      "fixture": "landing",
+      "expected_output": "Reporte corto que encuentra la clave de API expuesta en el JS del cliente y la falta de cabeceras de seguridad, descarta el resto de categorias como N/A con razon, y no inventa hallazgos de backend.",
+      "assertions": [
+        "Encuentra la clave fsk_live_ expuesta en assets/contacto.js servida al navegador",
+        "Senala la ausencia de cabeceras de seguridad HTTP (CSP, HSTS, X-Content-Type-Options, Referrer-Policy)",
+        "Declara N/A al menos backend, base de datos, autenticacion, contenedores y movil, con una razon breve cada uno",
+        "NO reporta hallazgos de inyeccion SQL, JWT, BOLA, Kubernetes ni prompt injection",
+        "NO reporta el innerHTML con cadena literal de assets/contacto.js como XSS",
+        "El reporte es proporcionalmente corto: menos de 12 hallazgos totales"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "modo-enfocado-dependencias",
+      "prompt": "no me hagas la auditoria completa todavia, solo quiero saber si las dependencias de ./tiendita tienen vulnerabilidades conocidas. lo demas lo vemos despues.",
+      "fixture": "tiendita",
+      "expected_output": "Respeta el modo Enfocado: revisa solo dependencias, no hace el inventario completo de 14 puntos, intenta ejecutar la herramienta real del ecosistema y declara cobertura parcial si no esta disponible.",
+      "assertions": [
+        "Respeta el alcance pedido: no entrega una auditoria completa de las demas categorias",
+        "Intenta ejecutar npm audit u otra herramienta real del ecosistema en vez de solo leer package.json a ojo",
+        "Si la herramienta no esta disponible o falla, lo dice explicitamente y declara que la cobertura es parcial en vez de presentar una revision visual como escaneo completo",
+        "Distingue entre 'hay una actualizacion disponible' y 'hay una vulnerabilidad conocida explotable'",
+        "NO inventa CVEs con numero especifico sin haberlos obtenido de una herramienta o base de datos real"
+      ]
+    }
+  ]
+}
