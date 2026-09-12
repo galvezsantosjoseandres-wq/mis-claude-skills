@@ -71,16 +71,19 @@ def integridad_fuente(run, fixture):
 
 
 def contexto_inflado(blob):
-    """Para el fixture simple: cada linea que menciona un concepto ajeno a un
-    sitio estatico, para que el calificador decida si es descarte o inflado."""
+    """Para el fixture simple: cada PARRAFO que menciona un concepto ajeno a un
+    sitio estatico, para que el calificador decida si es descarte o inflado.
+    Por parrafo y no por linea: la prosa envuelve, y partir por salto de linea
+    separa el concepto de la frase que lo descarta ("... inyeccion SQL,\nCORS,
+    contenedores) no aplica aqui"), produciendo falsos positivos de medicion."""
     salida = []
-    for linea in blob.splitlines():
-        l = linea.strip()
+    for bloque in re.split(r"\n\s*\n", blob):
+        l = " ".join(bloque.split())
         if not l:
             continue
         for pat in INFLADO:
             if re.search(pat, l, re.I):
-                salida.append(l[:220])
+                salida.append(l[:400])
                 break
     return salida[:40]
 
