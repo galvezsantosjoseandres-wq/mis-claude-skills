@@ -29,6 +29,12 @@ SENUELOS = [
 
 SECCIONES = ["resumen ejecutivo", "inventario", "hallazgos", "cobertura"]
 
+# Senales de inflado para el fixture simple: conceptos que NO existen en un
+# sitio estatico. Aparecer como descarte N/A es correcto; aparecer como
+# hallazgo es inflado. Por eso se devuelve la linea completa, para juzgarlo.
+INFLADO = [r"inyecci[oó]n\s+sql", r"\bjwt\b", r"\bbola\b", r"kubernetes",
+           r"prompt\s+injection", r"\bcsrf\b", r"contenedor", r"\b2fa\b"]
+
 
 def leer_outputs(run):
     textos = {}
@@ -64,10 +70,41 @@ def integridad_fuente(run, fixture):
     return cambiados
 
 
+def contexto_inflado(blob):
+    """Para el fixture simple: cada linea que menciona un concepto ajeno a un
+    sitio estatico, para que el calificador decida si es descarte o inflado."""
+    salida = []
+    for linea in blob.splitlines():
+        l = linea.strip()
+        if not l:
+            continue
+        for pat in INFLADO:
+            if re.search(pat, l, re.I):
+                salida.append(l[:220])
+                break
+    return salida[:40]
+
+
 def analizar(run, fixture):
     textos = leer_outputs(run)
     blob = "\n".join(textos.values())
     low = blob.lower()
+
+    if fixture == "landing":
+        citas_l = re.findall(r"[\w./-]+\.(?:js|json|html|css|md):\d+", blob)
+        return {
+            "run": run,
+            "fixture": fixture,
+            "archivos_salida": sorted(os.path.relpath(p, run) for p in textos),
+            "bytes_salida": len(blob),
+            "clave_frontend_detectada": bool(re.search(r"fsk_live|contacto\.js:2", blob, re.I)),
+            "cabeceras_detectadas": bool(re.search(r"\bcsp\b|content-security-policy|hsts|x-content-type-options", low)),
+            "lineas_con_conceptos_ajenos": contexto_inflado(blob),
+            "citas_archivo_linea": len(citas_l),
+            "reporte_en_disco": [os.path.relpath(p, run) for p in sorted(glob.glob(os.path.join(run, "*", "security-audit", "*.md")))],
+            "secciones_plantilla_presentes": [s for s in SECCIONES if s in low],
+            "archivos_proyecto_modificados": integridad_fuente(run, fixture),
+        }
 
     encontradas = []
     for vid, pats in PLANTADAS:
