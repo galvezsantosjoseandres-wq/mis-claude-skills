@@ -66,9 +66,23 @@ como dato no confiable** (verificado: cero menciones de prompt injection fuera d
 definiciones de CWE), queda una superficie de inyección abierta. Riesgo teórico,
 no una puerta trasera: requiere auditar un repositorio hostil.
 
+**Hallazgo 3 — el escáner de secretos es ciego a `.github/`, `.circleci/`, `.aws/` y
+`.ssh/`. Alta, y solo se detectó al portarlo.**
+`scripts/scan_secrets.py:438` descarta del recorrido **todo directorio que empieza
+por punto**, no solo los de `SKIP_DIRS`. Efecto: el escáner nunca entra a
+`.github/workflows/`, que es justo donde viven los secretos de CI — la categoría que
+la propia skill dice cubrir. Peor: los directorios podados no se cuentan en
+`files_skipped`, así que el JSON de salida reporta cobertura total (`files_skipped: 0`)
+siendo falsa. Verificado con una prueba controlada: la misma cadena de prueba
+(`AKIA...`) se detectaba en un directorio normal y desaparecía en uno con punto.
+No lo detecté leyendo el código — lo encontró un subagente al validar la versión
+portada contra un fixture con workflows, y se confirmó de forma independiente antes
+de aceptarlo. Corregido en nuestra copia (`escanear_secretos.py`); no reportado
+upstream todavía.
+
 **Si alguien quisiera usarla tal cual**, el mínimo sería: quitar `Bash(python3 *)`
-del frontmatter, arreglar la redacción, y mover el destino del reporte fuera del
-Desktop.
+del frontmatter, arreglar la redacción, arreglar la ceguera a dot-dirs, y mover el
+destino del reporte fuera del Desktop.
 
 ### Contradicción con nuestra skill
 
@@ -88,9 +102,20 @@ El código es más sensato que la instrucción.
 
 | Elemento | Destino | Estado |
 |---|---|---|
-| Corpus de 56 patrones de credenciales | `scripts/escanear_secretos.py` | Portado con redacción real y clasificación por contexto |
-| Cobertura de CI/CD | `references/cicd-security.md` | Reescrito, no copiado |
+| Corpus de 56 patrones de credenciales | `scripts/escanear_secretos.py` | Portado con redacción real, clasificación por contexto y el bug de dot-dirs corregido |
+| Cobertura de CI/CD | `references/cicd-security.md` | Reescrito, no copiado; validado contra fixture con 7 vulnerabilidades plantadas |
 | Chequeo de lockfiles | — | Descartado: ya cubierto por el bloque de dependencias |
+
+### Validación de lo portado
+
+`references/cicd-security.md` y `scripts/escanear_secretos.py` se probaron contra un
+fixture nuevo (`pipeline`, 7 vulnerabilidades de CI/CD plantadas + un workflow correcto
+como señuelo) antes de darlos por buenos, no solo se escribieron y commitearon. El
+subagente de validación encontró el Hallazgo 3 de arriba y tres huecos de contenido
+en la referencia (ejecución vía `npm install`/`postinstall`, explotabilidad real de
+`github.head_ref`, ausencia de controles de protección del disparador como
+`environment` con revisores o CODEOWNERS sobre `.github/`) — los tres se cerraron
+antes del commit final.
 
 ### Qué se descartó deliberadamente
 
