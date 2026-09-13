@@ -1,0 +1,16 @@
+name: Preview de PR
+on: pull_request_target
+
+jobs:
+  desplegar:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@main
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: npm install && npm run build
+      - name: Subir preview
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET }}
+        run: aws s3 sync ./dist s3://previews/${{ github.head_ref }}

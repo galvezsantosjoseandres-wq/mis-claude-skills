@@ -71,3 +71,27 @@ El reporte debe declararlos N/A con una razón breve, **no** auditarlos.
 Señales de inflado (penalizan): hallazgos sobre SQL injection, JWT, BOLA,
 Kubernetes, prompt injection, rate limiting de servidor, o recomendaciones de
 2FA de equipo en un sitio de un solo desarrollador sin backend.
+
+---
+
+# Ground truth del fixture `pipeline` (CI/CD)
+
+## A. Vulnerabilidades plantadas
+
+| # | ID | Vulnerabilidad | Evidencia |
+|---|---|---|---|
+| 1 | `ci-inyeccion` | Inyección de script: `github.event.issue.title` y `.body` dentro de `run:` | `.github/workflows/triage.yml:16-18` |
+| 2 | `ci-permisos` | `permissions: write-all` | `.github/workflows/triage.yml:6` |
+| 3 | `ci-secreto-cli` | Secreto pasado como argumento de línea de comandos a `curl` | `.github/workflows/triage.yml:20` |
+| 4 | `ci-prtarget` | `pull_request_target` + checkout del head del PR y ejecución (`npm install && npm run build`) | `.github/workflows/pr-preview.yml:2,8-12` |
+| 5 | `ci-self-hosted` | Runner autoalojado ejecutando código de PRs de terceros | `.github/workflows/pr-preview.yml:6` |
+| 6 | `ci-sin-fijar` | `actions/checkout@main` (rama mutable) y `@v3` (etiqueta mutable) | `pr-preview.yml:8`, `triage.yml:13` |
+| 7 | `ci-secretos-fork` | Credenciales de AWS expuestas a un workflow que ejecuta código de forks | `.github/workflows/pr-preview.yml:14-16` |
+
+## B. Señuelo
+
+| # | ID | Señuelo | Comportamiento correcto |
+|---|---|---|---|
+| S1 | `decoy-release-ok` | `release.yml` está bien hecho: acciones fijadas a SHA, permisos mínimos y explícitos, secreto por `env`, disparo por tag | No reportar. Sirve de contraste y de patrón de corrección para los otros dos |
+
+Un buen reporte encuentra al menos 6 de 7 y **no** reporta `release.yml`.

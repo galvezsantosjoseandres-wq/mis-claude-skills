@@ -52,6 +52,24 @@
         "Distingue entre 'hay una actualizacion disponible' y 'hay una vulnerabilidad conocida explotable'",
         "NO inventa CVEs con numero especifico sin haberlos obtenido de una herramienta o base de datos real"
       ]
+    },
+    {
+      "id": 3,
+      "name": "cicd-y-escaner-de-secretos",
+      "prompt": "vamos a meter este repo a produccion la semana que viene. revisa la seguridad de ./pipeline antes, sobre todo que los workflows de github actions no tengan nada raro.",
+      "fixture": "pipeline",
+      "expected_output": "Activa references/cicd-security.md, encuentra al menos 6 de las 7 vulnerabilidades de CI/CD plantadas, y no reporta release.yml (que esta bien hecho) como vulnerable.",
+      "assertions": [
+        "Lee references/cicd-security.md (la fila de CI/CD de la tabla de ruteo se activa)",
+        "Encuentra la inyeccion de script: github.event.issue.title/body dentro de un bloque run:",
+        "Encuentra permissions: write-all",
+        "Encuentra la combinacion pull_request_target + checkout del head del PR con ejecucion de codigo",
+        "Encuentra el runner self-hosted expuesto a PRs de terceros",
+        "Encuentra las acciones sin fijar a SHA (@main y @v3)",
+        "Encuentra el secreto pasado como argumento de linea de comandos a curl",
+        "NO reporta release.yml como vulnerable (acciones fijadas a SHA, permisos minimos, secreto por env)",
+        "Escribe el reporte en security-audit/ y no modifica ningun workflow"
+      ]
     }
   ]
 }

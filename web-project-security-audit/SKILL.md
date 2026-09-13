@@ -29,6 +29,7 @@ No preguntes "¿qué stack usas?" de forma genérica — investiga o pregunta pu
 12. **Correo saliente**: ¿el dominio envía correos transaccionales o de marketing?
 13. **Equipo/acceso**: ¿un solo desarrollador o varias personas con acceso al repo/infraestructura?
 14. **Secretos y proveedores externos**: ¿qué APIs de terceros consume y con qué credenciales?
+15. **CI/CD**: ¿hay pipelines automáticos (GitHub Actions, GitLab CI, Jenkins)? ¿se disparan con PRs de terceros? ¿tienen secretos de despliegue?
 
 Si el proyecto es tan simple que muchas de estas preguntas no aplican (por ejemplo, un sitio estático de una página), está perfectamente bien que la mayoría de categorías se descarten — el inventario corto es un resultado legítimo, no un fallo del proceso. Lo que no es aceptable es saltarse el inventario y asumir la respuesta.
 
@@ -60,6 +61,7 @@ Cada fila que el inventario active corresponde a un archivo de `references/`. **
 | Cifrado, descifrado o firmas implementados en el código del proyecto | `references/criptografia.md` |
 | Contenedores, Kubernetes, VMs propias, IaC o múltiples cuentas cloud | `references/infraestructura.md` |
 | Un modelo de IA de cara al usuario: chatbot, asistente, RAG, agente con herramientas | `references/ia-y-prompt-injection.md` |
+| Pipelines de CI/CD: GitHub Actions, GitLab CI, Jenkins, cualquier automatización disparada por push, PR o comentario | `references/cicd-security.md` |
 
 Puedes leer varios. Si dudas entre leer uno o no, léelo: el coste de abrir un archivo de más es trivial comparado con el de omitir una clase de vulnerabilidad que sí aplicaba.
 
@@ -69,7 +71,12 @@ Puedes leer varios. Si dudas entre leer uno o no, léelo: el coste de abrir un a
 
 Estos aplican a casi cualquier proyecto y son lo bastante compactos para vivir aquí:
 
-- **Gestión de secretos** (siempre que haya al menos una API key): nunca en el repo ni en su historial, siempre como variables de entorno/secret manager de la plataforma. Herramienta concreta para el escaneo: `gitleaks` (gratuito, funciona sobre el historial completo de git, detecta patrones de credenciales de la mayoría de proveedores conocidos) — más confiable que solo hacer `grep` manual de patrones. Si el proyecto tiene CI/CD, considerar agregar el escaneo como paso automático en cada push, no solo como auditoría puntual.
+- **Gestión de secretos** (siempre que haya al menos una API key): nunca en el repo ni en su historial, siempre como variables de entorno/secret manager de la plataforma. Para el escaneo, en este orden:
+  1. `gitleaks` si está disponible — es lo único que cubre el **historial completo de git**, que es donde vive el riesgo real.
+  2. Si no lo está, ejecuta el escáner incluido: `python3 <ruta-de-esta-skill>/scripts/escanear_secretos.py <proyecto>`. Solo stdlib, sin red, sin instalar nada; 56 patrones de proveedores conocidos y salida JSON. Redacta los valores: nunca imprime un secreto completo, conserva solo el prefijo que identifica al proveedor. Su campo `contexto` (`primera-parte` / `test` / `vendorizado`) alimenta directamente la regla de triaje de la Fase A.
+  3. Solo si ninguno está disponible, `grep` manual — y entonces declara la cobertura como parcial.
+
+  Ninguna de las dos primeras cubre el historial salvo `gitleaks`: si usas el escáner incluido, dilo en "Cobertura" y recomienda pasar `gitleaks detect --log-opts="--all"` antes de un lanzamiento. Si el proyecto tiene CI/CD, considerar agregar el escaneo como paso automático en cada push, no solo como auditoría puntual.
   - **Si el escaneo encuentra una clave filtrada en el historial de git**: no basta con eliminarla del código actual ni con reescribir el historial — la clave ya estuvo pública en algún momento y debe considerarse comprometida. El paso obligatorio es **rotarla** (generar una nueva credencial en el proveedor y revocar la antigua). Señálalo como hallazgo ⚠️ aunque el archivo ya no contenga la clave en el estado actual del repo.
   - **Secretos en el frontend**: verificar que ninguna API key, token o credencial con permisos de escritura o de lectura sensible quede embebida en código que se sirve al navegador (JS del cliente, variables `NEXT_PUBLIC_`/`VITE_`/similares mal usadas, HTML generado). Cualquier credencial visible en el bundle del cliente **es pública** — si el proveedor no ofrece una clave de solo-lectura restringida por dominio para ese uso, la llamada debe pasar por el backend.
   - **Higiene de logs**: que el código de logging (aplicación, middleware, manejadores de errores) no imprima claves, tokens, contraseñas, cookies de sesión ni cuerpos completos de requests/responses. Atención a los errores no controlados que vuelcan el objeto de configuración completo o un stack trace con variables de entorno.
@@ -158,7 +165,7 @@ que hay que arreglar hoy si solo se pudiera arreglar una cosa.
 ## Inventario detectado
 | Componente | ¿Presente? | Detalle |
 |---|---|---|
-(una fila por cada uno de los 14 puntos del Paso 1)
+(una fila por cada uno de los 15 puntos del Paso 1)
 
 ## Hallazgos
 (ordenados de mayor a menor severidad)
