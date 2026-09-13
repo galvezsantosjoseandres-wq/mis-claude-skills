@@ -3,6 +3,11 @@
 Aplica si el inventario detectó **cualquier endpoint que reciba input externo**:
 formulario, API, webhook, parámetro de URL, cabecera, o subida de archivos.
 
+Todo lo de aquí presupone un endpoint HTTP. La entrada externa también llega por
+**eventos de plataforma** —el título de un issue, el cuerpo de un PR, un nombre de
+rama— que acaban interpolados en un pipeline sin pasar por ningún endpoint: eso está
+en `cicd-security.md`.
+
 Contenido: inyección · XSS · open redirect · cabecera Host · XXE · rate limiting · CORS · uploads
 
 ## Inyección

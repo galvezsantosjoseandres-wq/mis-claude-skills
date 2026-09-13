@@ -40,6 +40,13 @@ Campos controlables por un tercero sin permisos en el repo: título y cuerpo de
 issues, PRs, comentarios y reviews; mensajes de commit; `head_ref` (nombre de rama);
 nombre para mostrar del autor.
 
+**Sobre `github.head_ref` en particular:** es fácil descartarlo pensando que git no
+admite metacaracteres en nombres de rama. Sí los admite. Verificable con
+`git check-ref-format`: `feat/x;whoami`, `feat/x|id`, `feat/x&&id`, `feat/$(id)` y
+``feat/`id` `` son todos nombres de rama **válidos**. Git solo rechaza espacios,
+`~`, `^`, `:`, `?`, `*`, `[`, `\` y unos pocos casos más — ninguno de los cuales hace
+falta para inyectar. Un fork con una rama así, interpolada en un `run:`, ejecuta.
+
 ### Vulnerable
 
 ```yaml
@@ -67,6 +74,17 @@ con una cuenta de GitHub).
 a diferencia de `pull_request`. Existe para que un workflow pueda etiquetar o comentar
 en PRs de forks. Si además hace checkout del código del fork y lo ejecuta —build,
 tests, lint— cualquiera que abra un PR ejecuta su código con tus secretos.
+
+**El detalle que lo convierte en explotación trivial: no hace falta que el workflow
+llegue a ejecutar el build.** `npm install` (y `yarn`, y `pnpm install`) ejecutan los
+scripts `preinstall`/`install`/`postinstall` del `package.json` **del fork**. Es decir,
+la línea `run: npm install` por sí sola ya es ejecución de código controlado por el
+atacante, antes de que corra un solo test. Lo mismo aplica a `pip install -e .`
+(ejecuta `setup.py`) y a `bundle install` con gemas de ruta local.
+
+Mitigación cuando la instalación es inevitable: `npm ci --ignore-scripts`. Pero si el
+workflow tiene secretos y toca código de un fork, la corrección real es separarlo, no
+endurecer la instalación.
 
 ### Patrón
 
@@ -185,6 +203,39 @@ los runners sean efímeros y estén aislados.
 
 **CWE-693 · OWASP A08 · Alta en repositorio público.**
 
+## 7. Protección del disparador y de la propia definición del pipeline
+
+Los controles anteriores endurecen cada workflow. Estos cortan cadenas enteras, y
+suelen faltar porque no viven en el YAML sino en la configuración del repositorio:
+
+- **Aprobación requerida para colaboradores externos.** En Settings → Actions,
+  *"Require approval for all external contributors"* (o al menos para quienes nunca
+  han contribuido). Sin esto, cualquiera con una cuenta dispara tus pipelines.
+- **`environment:` con revisores requeridos** en los jobs que despliegan o publican.
+  Los secretos de un entorno protegido no se entregan hasta que una persona aprueba,
+  lo que convierte una cadena automática en una que necesita intervención humana:
+
+  ```yaml
+  jobs:
+    publicar:
+      environment: produccion   # con required reviewers configurados
+  ```
+
+- **CODEOWNERS sobre `.github/`.** Si el archivo de CI no requiere revisión para
+  cambiarse, cualquiera con acceso de escritura puede exfiltrar todos los secretos
+  con un commit — y eso incluye a un colaborador cuya cuenta fue comprometida.
+
+  ```
+  /.github/ @equipo-de-seguridad
+  ```
+
+- **Protección de tags** si hay workflows disparados por tags: sin ella, quien pueda
+  empujar un tag puede disparar una publicación.
+
+Estos cuatro no se ven leyendo los YAML. Hay que preguntarlos o revisarlos en la
+configuración del repositorio, y si no tienes acceso, declararlo en la sección
+"Cobertura" del reporte en vez de darlos por hechos.
+
 ## Otras plataformas
 
 Los mecanismos cambian de nombre, el riesgo no:
@@ -207,3 +258,6 @@ Los mecanismos cambian de nombre, el riesgo no:
 | Acciones sin fijar a SHA | CWE-829 | A08 | Alta |
 | Secretos en logs o argumentos | CWE-200, CWE-214 | A02 | Crítica si hay fuga |
 | Runner autoalojado en repo público | CWE-693 | A08 | Alta |
+| `npm install` sobre código de un fork (ejecuta `postinstall`) | CWE-94 | A08 | Crítica |
+| Sin aprobación requerida para externos / sin `environment` protegido | CWE-862 | A01 | Alta |
+| `.github/` sin CODEOWNERS | CWE-732 | A01 | Media |

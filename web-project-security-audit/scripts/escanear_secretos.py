@@ -45,6 +45,11 @@ SKIP_DIRS = {
     ".tox", ".mypy_cache", ".pytest_cache", "dist", "build",
     ".next", ".nuxt", "vendor", "target", "Pods", ".gradle",
     "coverage", ".nyc_output", ".cache", "bower_components",
+    # Dot-dirs ruidosos anadidos al portar: antes quedaban cubiertos por un
+    # descarte generico de todo lo que empieza por punto, que causaba el bug
+    # descrito abajo.
+    ".idea", ".vscode", ".svn", ".hg", ".terraform", ".serverless",
+    ".pnpm-store", ".yarn", ".turbo", ".parcel-cache",
 }
 
 SKIP_EXTENSIONS = {
@@ -444,7 +449,11 @@ def check_gitignore(target_dir: Path) -> list:
     if not gitignore_path.exists():
         findings.append({
             "type": "Missing .gitignore",
-            "severity": "medium",
+            # `info`, no `medium`: no hay evidencia de que se haya filtrado
+            # nada. Presentarlo como hallazgo de severidad media infla el
+            # reporte, que es justo lo que la Fase A prohibe.
+            "severity": "info",
+            "contexto": "higiene",
             "file": str(target_dir / ".gitignore"),
             "line": 0,
             "description": "No .gitignore file found — sensitive files may be committed",
@@ -464,6 +473,7 @@ def check_gitignore(target_dir: Path) -> list:
                     findings.append({
                         "type": ".env not gitignored",
                         "severity": "high",
+                        "contexto": "higiene",
                         "file": str(gitignore_path),
                         "line": 0,
                         "description": f".env files exist ({', '.join(f.name for f in env_files)}) but .env is not in .gitignore",
@@ -490,7 +500,13 @@ def get_staged_files() -> list:
 
 
 def scan_directory(target_dir: Path) -> list:
-    """Scan all files in a directory for secrets."""
+    """Escanea un arbol de directorios en busca de credenciales.
+
+    `dirs_saltados` existe para que la metadata no afirme cobertura total
+    cuando se podaron arboles enteros: un reporte que no dice que NO miro se
+    lee como si lo hubiera mirado todo.
+    """
+    dirs_saltados: list = []
     compiled = [(name, re.compile(pattern), severity, desc)
                 for name, pattern, severity, desc in PATTERNS]
 
@@ -500,7 +516,16 @@ def scan_directory(target_dir: Path) -> list:
 
     for root, dirs, files in os.walk(target_dir):
         # Skip hidden and known dirs
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS and not d.startswith(".")]
+        # NO descartar todo lo que empieza por punto. El original lo hacia, y
+        # eso dejaba `.github/`, `.circleci/`, `.gitlab/`, `.aws/` y `.ssh/`
+        # completamente fuera del escaneo — justo donde viven los secretos de
+        # CI y las credenciales de despliegue. Verificado: la misma cadena
+        # AKIA... se detectaba en `plain/x.yml` y se perdia en
+        # `.github/workflows/x.yml`, con la metadata reportando cobertura
+        # total. SKIP_DIRS ya enumera los dot-dirs que si conviene saltarse.
+        omitidos = [d for d in dirs if d in SKIP_DIRS]
+        dirs_saltados.extend(omitidos)
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
 
         for filename in files:
             filepath = Path(root) / filename
@@ -515,7 +540,7 @@ def scan_directory(target_dir: Path) -> list:
     # Also check .gitignore coverage
     findings.extend(check_gitignore(target_dir))
 
-    return findings, file_count, skipped_count
+    return findings, file_count, skipped_count, sorted(set(dirs_saltados))
 
 
 def scan_staged() -> list:
@@ -577,7 +602,7 @@ def main():
         print(json.dumps({"error": f"Not a directory: {target}"}))
         sys.exit(1)
 
-    findings, file_count, skipped_count = scan_directory(target)
+    findings, file_count, skipped_count, dirs_saltados = scan_directory(target)
 
     if output_mode == "summary":
         severity_counts = {}
@@ -596,7 +621,13 @@ def main():
             "metadata": {
                 "files_scanned": file_count,
                 "files_skipped": skipped_count,
+                "dirs_skipped": dirs_saltados,
                 "total_findings": len(findings),
+                "cobertura": (
+                    "Solo el arbol de trabajo actual. NO cubre el historial de git: "
+                    "una clave ya rotada del codigo puede seguir en commits anteriores. "
+                    "Para eso hace falta `gitleaks detect --log-opts=\"--all\"`."
+                ),
             }
         }
         print(json.dumps(result, indent=2))

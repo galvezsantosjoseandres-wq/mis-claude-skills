@@ -187,6 +187,11 @@ que hay que arreglar hoy si solo se pudiera arreglar una cosa.
 ## Falsos positivos descartados
 (lo que parecía un problema y no lo era, con la razón)
 
+## Controles correctos verificados
+(lo que está bien implementado y se comprobó. No es relleno: le dice al usuario
+qué NO tiene que tocar, y a menudo el patrón correcto que ya existe en su propio
+proyecto sirve de modelo para corregir el que falla — citarlo así ahorra discusión)
+
 ## Categorías descartadas (N/A)
 (una línea por categoría no activada por el inventario, con el motivo)
 
